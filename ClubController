@@ -1,0 +1,82 @@
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using RunGroopWebApp.Data;
+using RunGroopWebApp.Data.Enum;
+using RunGroopWebApp.Interfaces;
+using RunGroopWebApp.Models;
+using RunGroopWebApp.ViewModels;
+
+namespace RunGroopWebApp.Controllers
+{
+    public class ClubController : Controller
+    {
+        private readonly IClubRepository _clubRepository;
+        private readonly IPhotoService _photoService;
+
+        // Конструктор, приемащ два параметъра
+        public ClubController(IClubRepository clubRepository, IPhotoService photoService)
+        {
+            _clubRepository = clubRepository;
+        }
+
+        // Действие "Index", връщащ списък с клубове
+        public async Task<IActionResult> Index()
+        {
+            IEnumerable<Club> clubs = await _clubRepository.GetAll();
+            return View(clubs);
+        }
+
+        // Действие "Detail", връщащ детайли за определен клуб
+        public async Task<IActionResult> Detail(int id)
+        {
+            Club club = await _clubRepository.GetByIdAsync(id);
+            return View(club);
+        }
+
+        // Действие "Create" (HTTP GET), връщащ изглед за създаване на нов клуб
+        public IActionResult Create() 
+        {
+            return View();
+        }
+
+        // Действие "Create" (HTTP POST), създаващо нов клуб
+        [HttpPost]
+        public async Task<IActionResult> Create(CreateClubViewModel clubVM)
+        {
+            // Проверка дали моделът е валиден
+            if (!ModelState.IsValid)
+            {
+                // Добавяне на снимка към клуба чрез сервиза _photoService
+                var result = await _photoService.AddPhotoAsync(clubVM.Image);
+
+                // Създаване на клуб и адрес на базата на входните данни от ViewModel
+                var club = new Club
+                {
+                    Title = clubVM.Title,
+                    Description = clubVM.Description,
+                    Image = result.Url.ToString(),
+                    Address = new Address
+                    {
+                        Street = clubVM.Address.Street,
+                        City = clubVM.Address.City,
+                        State = clubVM.Address.State,
+                    }
+                };
+
+                // Добавяне на клуба към репозитория
+                _clubRepository.Add(club);
+
+                // Пренасочване към "Index"
+                return RedirectToAction("Index");
+            }
+            else
+            {
+                // Ако моделът не е валиден, добавя се грешка към модела
+                ModelState.AddModelError("", "Грешка при качване на снимка");
+            }
+
+            // Връща се изгледа с въведените данни за клуба
+            return View(clubVM);
+        }
+    }
+}
